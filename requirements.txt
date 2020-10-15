@@ -4,4 +4,4 @@ numpy
 scipy
 typing_extensions
 
-git+https://github.com/haowen-xu/ml-essentials.git
+# git+https://github.com/haowen-xu/ml-essentials.git
