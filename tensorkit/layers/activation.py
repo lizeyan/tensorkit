@@ -7,8 +7,12 @@ __all__ = [
 ]
 
 
-class ReLU(BaseLayer):
+class SoftPlus(BaseLayer):
+    def forward(self, input: Tensor) -> Tensor:
+        return softplus(input)
 
+
+class ReLU(BaseLayer):
     def forward(self, input: Tensor) -> Tensor:
         return relu(input)
 

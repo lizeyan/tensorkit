@@ -62,7 +62,7 @@ class Settings(Config):
     )
     float_x: str = ConfigField(
         default='float32',
-        choices=['float32', 'float64'],
+        choices=['float32', 'float64', 'float16'],
         envvar='TENSORKIT_FLOATX',
         description='The default dtype for floating-point numbers. '
                     'Changing the value of this configuration at runtime may '

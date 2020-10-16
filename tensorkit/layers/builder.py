@@ -4,6 +4,7 @@ from typing import *
 from mltk.utils import NOT_SET
 
 from .activation import *
+from .activation import SoftPlus
 from .composed import *
 from .core import *
 from .pool import *
@@ -405,6 +406,9 @@ class SequentialBuilder(object):
         self._assert_out_shape((False,), at_least=True)
         layer = self.layer_args.build(type_, **kwargs)
         return self.add(layer, self.out_shape)
+
+    def softplus(self):
+        return self._make_activation(SoftPlus)
 
     def relu(self):
         return self._make_activation(ReLU)
