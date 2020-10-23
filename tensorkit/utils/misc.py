@@ -1,4 +1,4 @@
-from typing import Any, Optional, List, Tuple
+from typing import Any, Optional, List, Tuple, Callable
 
 import numpy as np
 
@@ -10,10 +10,11 @@ from tensorkit import tensor as T
 def print_experiment_summary(exp: mltk.Experiment,
                              train_data: Any,  # anything that has '__len__'
                              val_data: Optional[Any] = None,
-                             test_data: Optional[Any] = None):
+                             test_data: Optional[Any] = None,
+                             printer: Optional[Callable[[str], Any]] = print):
     # the config
     mltk.print_config(exp.config)
-    print('')
+    printer('')
 
     # the dataset info
     data_info = []
@@ -22,8 +23,8 @@ def print_experiment_summary(exp: mltk.Experiment,
         if data is not None:
             data_info.append((name, len(data)))
     if data_info:
-        print(mltk.format_key_values(data_info, 'Number of Data'))
-        print('')
+        printer(mltk.format_key_values(data_info, 'Number of Data'))
+        printer('')
 
     # the device info
     device_info = [
@@ -32,11 +33,13 @@ def print_experiment_summary(exp: mltk.Experiment,
     gpu_devices = T.gpu_device_list()
     if gpu_devices:
         device_info.append(('Available', gpu_devices))
-    print(mltk.format_key_values(device_info, 'Device Info'))
-    print('')
+    printer(mltk.format_key_values(device_info, 'Device Info'))
+    printer('')
 
 
-def print_parameters_summary(params: List[T.Variable], names: List[str]):
+def print_parameters_summary(
+        params: List[T.Variable], names: List[str], printer: Optional[Callable[[str], Any]] = print
+):
     shapes = []
     sizes = []
     total_size = 0
@@ -71,7 +74,7 @@ def print_parameters_summary(params: List[T.Variable], names: List[str]):
         k = len(lines[-1])
         lines.insert(-1, '-' * k)
 
-        print('\n'.join(lines))
+        printer('\n'.join(lines))
 
 
 def get_weights_and_names(layer: T.Module) -> Tuple[List[T.Variable], List[str]]:
