@@ -1,5 +1,6 @@
 import mltk
 import tensorkit as tk
+import tensorkit.utils.misc
 from tensorkit import tensor as T
 from tensorkit.examples import utils
 
@@ -30,7 +31,7 @@ def main(exp: mltk.Experiment[Config]):
         x_range=(-1., 1.),
     )
 
-    utils.print_experiment_summary(
+    tensorkit.utils.misc.print_experiment_summary(
         exp, train_data=train_stream, val_data=val_stream,
         test_data=test_stream
     )
@@ -45,8 +46,8 @@ def main(exp: mltk.Experiment[Config]):
         linear(10). \
         log_softmax(). \
         build()
-    params, param_names = utils.get_params_and_names(net)
-    utils.print_parameters_summary(params, param_names)
+    params, param_names = tensorkit.utils.misc.get_params_and_names(net)
+    tensorkit.utils.misc.print_parameters_summary(params, param_names)
     print('')
     mltk.print_with_time('Network constructed.')
 

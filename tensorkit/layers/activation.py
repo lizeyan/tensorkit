@@ -3,8 +3,17 @@ from ..tensor.nn import *
 from .core import *
 
 __all__ = [
-    'ReLU', 'LeakyReLU', 'Tanh', 'HardTanh', 'Sigmoid', 'LogSoftmax',
+    'ReLU', 'LeakyReLU', 'Tanh', 'HardTanh', 'Sigmoid', 'LogSoftmax', "SoftPlus", "ElementwiseConstantLambda"
 ]
+
+
+class ElementwiseConstantLambda(BaseLayer):
+    def forward(self, input: Tensor) -> Tensor:
+        return self.func(input)
+
+    def __init__(self, func):
+        super(ElementwiseConstantLambda, self).__init__()
+        self.func = func
 
 
 class SoftPlus(BaseLayer):

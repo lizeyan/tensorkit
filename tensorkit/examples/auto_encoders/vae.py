@@ -3,6 +3,7 @@ from typing import *
 
 import mltk
 import tensorkit as tk
+import tensorkit.utils.misc
 from tensorkit import tensor as T
 from tensorkit.examples import utils
 from tensorkit.typing_ import TensorOrData
@@ -98,13 +99,13 @@ def main(exp: mltk.Experiment[Config]):
         mapper=utils.BernoulliSampler().as_mapper(),
     )
 
-    utils.print_experiment_summary(
+    tensorkit.utils.misc.print_experiment_summary(
         exp, train_data=train_stream, test_data=test_stream)
 
     # build the network
     vae: VAE = VAE(train_stream.data_shapes[0][0], exp.config)
-    params, param_names = utils.get_params_and_names(vae)
-    utils.print_parameters_summary(params, param_names)
+    params, param_names = tensorkit.utils.misc.get_params_and_names(vae)
+    tensorkit.utils.misc.print_parameters_summary(params, param_names)
     print('')
     mltk.print_with_time('Network constructed.')
 
