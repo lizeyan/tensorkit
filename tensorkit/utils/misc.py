@@ -13,7 +13,7 @@ def print_experiment_summary(exp: mltk.Experiment,
                              test_data: Optional[Any] = None,
                              printer: Optional[Callable[[str], Any]] = print):
     # the config
-    mltk.print_config(exp.config)
+    mltk.print_config(exp.config, print_func=printer)
     printer('')
 
     # the dataset info
