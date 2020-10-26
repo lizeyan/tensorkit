@@ -218,7 +218,7 @@ def get_gpu_memory_list() -> Dict[str, Dict[str, float]]:
         return ret
 
 
-def most_free_gpu_device(fallback_to_cpu: bool = True, least_free_mib: float = None) -> str:
+def most_free_gpu_device(fallback_to_cpu: bool = True, least_free_mib: float = None, occupy: bool=False) -> str:
     gpu_memory_list = get_gpu_memory_list()
     if len(gpu_memory_list) == 0:
         if fallback_to_cpu:
@@ -228,7 +228,13 @@ def most_free_gpu_device(fallback_to_cpu: bool = True, least_free_mib: float = N
     else:
         most_free = sorted(list(gpu_memory_list.items()), key=lambda item: item[1]['free'])[-1]
         if least_free_mib is None or most_free[1]["free"] > least_free_mib:
-            return most_free[0]
+            try:
+                if occupy:
+                    x = torch.rand((256, 1024, least_free_mib)).cuda()
+                    del x
+                return most_free[0]
+            except RuntimeError:
+                return most_free_gpu_device(fallback_to_cpu, least_free_mib, occupy)
         elif fallback_to_cpu:
             return CPU_DEVICE
         else:
