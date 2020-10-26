@@ -1,4 +1,5 @@
 import math
+import subprocess
 from contextlib import contextmanager
 from typing import *
 
@@ -24,7 +25,7 @@ __all__ = [
 
     # device
     'get_device', 'to_device', 'current_device', 'use_device',
-    'gpu_device_list', 'first_gpu_device',
+    'gpu_device_list', 'first_gpu_device', "get_gpu_memory_list", "most_free_gpu_device",
 
     # utilities
     'int_range', 'identity',
@@ -106,7 +107,6 @@ __all__ = [
     'is_all', 'is_any', 'is_finite', 'assert_finite',
 ]
 
-
 # ---- constants ----
 IS_CHANNEL_LAST = False
 """Whether or not the channel axis is the last axis for convolutional operations?"""
@@ -116,7 +116,6 @@ EPSILON = 1e-6
 
 CPU_DEVICE = 'cpu'
 """The constant that represents the local CPU device."""
-
 
 # ---- typing ----
 Tensor = torch.Tensor
@@ -196,6 +195,46 @@ def gpu_device_list() -> List[str]:
     return [f'cuda:{index}' for index in range(torch.cuda.device_count())]
 
 
+def get_gpu_memory_list() -> Dict[str, Dict[str, float]]:
+    if torch.cuda.device_count() <= 0:
+        return {}
+    p = subprocess.Popen(
+        "nvidia-smi --query-gpu=memory.total,memory.used --format=csv,nounits,noheader", shell=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    p.wait()
+    stdout, stderr = p.communicate()
+    if p.poll() != 0:
+        raise RuntimeError(f"failed to execute nvidia-smi: {stderr}")
+    else:
+        ret = {
+            f"cuda:{idx}": {
+                "total": float(_.split(',')[0]),
+                "used": float(_.split(",")[1]),
+                "free": float(_.split(',')[0]) - float(_.split(",")[1]),
+            }
+            for idx, _ in enumerate(stdout.decode().splitlines(keepends=False))
+        }
+        return ret
+
+
+def most_free_gpu_device(fallback_to_cpu: bool = True, least_free_mib: float = None) -> str:
+    gpu_memory_list = get_gpu_memory_list()
+    if len(gpu_memory_list) == 0:
+        if fallback_to_cpu:
+            return CPU_DEVICE
+        else:
+            raise RuntimeError('No GPU is available.')
+    else:
+        most_free = sorted(list(gpu_memory_list.items()), key=lambda item: item[1]['free'])[-1]
+        if least_free_mib is None or most_free[1]["free"] > least_free_mib:
+            return most_free[0]
+        elif fallback_to_cpu:
+            return CPU_DEVICE
+        else:
+            raise RuntimeError(f'No enough memory: {most_free}')
+
+
 def first_gpu_device(fallback_to_cpu: bool = True) -> str:
     gpu_list = gpu_device_list()
     if not gpu_list:
@@ -232,7 +271,8 @@ def cast(input: Tensor,
         elif dtype == 'int32':
             target_dtype = torch.int32
         else:
-            target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64, 'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
+            target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64,
+                            'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
 
     if target_dtype != input.dtype and device is not None:
         input = input.to(dtype=target_dtype, device=device)
@@ -257,7 +297,9 @@ def get_dtype(input: Tensor) -> str:
     elif input.dtype == torch.int32:
         return 'int32'
     else:
-        return {torch.int8: 'int8', torch.uint8: 'uint8', torch.int16: 'int16', torch.int64: 'int64', torch.float16: 'float16', torch.float64: 'float64', torch.bool: 'bool'}[input.dtype]
+        return \
+        {torch.int8: 'int8', torch.uint8: 'uint8', torch.int16: 'int16', torch.int64: 'int64', torch.float16: 'float16',
+         torch.float64: 'float64', torch.bool: 'bool'}[input.dtype]
 
 
 @jit
@@ -318,7 +360,8 @@ def as_tensor(data,
             elif dtype == 'int32':
                 target_dtype = torch.int32
             else:
-                target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64, 'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
+                target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64,
+                                'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
 
     # check the device argument
     if device is None:
@@ -375,14 +418,14 @@ def from_numpy(data,
 def float_scalar(data: float,
                  dtype: str = settings.float_x,
                  device: Optional[str] = None) -> Tensor:
-   if dtype == 'float32':
-       real_dtype = torch.float32
-   else:
-       real_dtype = {'float16': torch.float16, 'float64': torch.float64}[dtype]
+    if dtype == 'float32':
+        real_dtype = torch.float32
+    else:
+        real_dtype = {'float16': torch.float16, 'float64': torch.float64}[dtype]
 
-   if device is None:
-       device = current_device()
-   return torch.tensor(data, dtype=real_dtype, device=device)
+    if device is None:
+        device = current_device()
+    return torch.tensor(data, dtype=real_dtype, device=device)
 
 
 @jit
@@ -394,14 +437,14 @@ def float_scalar_like(data: float, like: Tensor) -> Tensor:
 def float_list(data: List[float],
                dtype: str = settings.float_x,
                device: Optional[str] = None) -> Tensor:
-   if dtype == 'float32':
-       real_dtype = torch.float32
-   else:
-       real_dtype = {'float16': torch.float16, 'float64': torch.float64}[dtype]
+    if dtype == 'float32':
+        real_dtype = torch.float32
+    else:
+        real_dtype = {'float16': torch.float16, 'float64': torch.float64}[dtype]
 
-   if device is None:
-       device = current_device()
-   return torch.tensor(data, dtype=real_dtype, device=device)
+    if device is None:
+        device = current_device()
+    return torch.tensor(data, dtype=real_dtype, device=device)
 
 
 @jit
@@ -456,7 +499,9 @@ def zeros(shape: List[int],
     elif dtype == 'int32':
         target_dtype = torch.int32
     else:
-        target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64, 'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
+        target_dtype = \
+        {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64, 'float16': torch.float16,
+         'float64': torch.float64, 'bool': torch.bool}[dtype]
 
     if device is None:
         device = current_device()
@@ -473,7 +518,8 @@ def zeros_like(input: Tensor,
         elif dtype == 'int32':
             target_dtype = torch.int32
         else:
-            target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64, 'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
+            target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64,
+                            'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
     else:
         target_dtype = input.dtype
     if shape is None:
@@ -490,7 +536,9 @@ def ones(shape: List[int],
     elif dtype == 'int32':
         target_dtype = torch.int32
     else:
-        target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64, 'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
+        target_dtype = \
+        {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64, 'float16': torch.float16,
+         'float64': torch.float64, 'bool': torch.bool}[dtype]
 
     if device is None:
         device = current_device()
@@ -507,7 +555,8 @@ def ones_like(input: Tensor,
         elif dtype == 'int32':
             target_dtype = torch.int32
         else:
-            target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64, 'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
+            target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64,
+                            'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
     else:
         target_dtype = input.dtype
     if shape is None:
@@ -525,7 +574,9 @@ def full(shape: List[int],
     elif dtype == 'int32':
         target_dtype = torch.int32
     else:
-        target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64, 'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
+        target_dtype = \
+        {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64, 'float16': torch.float16,
+         'float64': torch.float64, 'bool': torch.bool}[dtype]
 
     if device is None:
         device = current_device()
@@ -543,7 +594,8 @@ def full_like(input: Tensor,
         elif dtype == 'int32':
             target_dtype = torch.int32
         else:
-            target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64, 'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
+            target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64,
+                            'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
     else:
         target_dtype = input.dtype
     if shape is None:
@@ -559,7 +611,9 @@ def arange(start: int, end: int, step: int = 1, dtype: str = 'int32',
     elif dtype == 'int32':
         target_dtype = torch.int32
     else:
-        target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64, 'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
+        target_dtype = \
+        {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64, 'float16': torch.float16,
+         'float64': torch.float64, 'bool': torch.bool}[dtype]
 
     if device is None:
         device = current_device()
@@ -598,7 +652,9 @@ def eye(n: int,
     elif dtype == 'int32':
         target_dtype = torch.int32
     else:
-        target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64, 'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
+        target_dtype = \
+        {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64, 'float16': torch.float16,
+         'float64': torch.float64, 'bool': torch.bool}[dtype]
 
     if m is None:
         m = n
@@ -662,7 +718,8 @@ def variable(shape: List[int],
         elif dtype == 'int32':
             target_dtype = torch.int32
         else:
-            target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64, 'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
+            target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64,
+                            'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
     else:
         target_dtype = dtype
 
@@ -806,7 +863,7 @@ def repeat(input: Tensor, repeats: List[int]) -> Tensor:
     elif mode < 2:
         extra_len = max_length - in_shape_len
         expands = repeats[:extra_len] + \
-            [-1 if a == 1 else a for a in repeats[extra_len:]]
+                  [-1 if a == 1 else a for a in repeats[extra_len:]]
         return input.expand(expands)
     else:
         return input.repeat(repeats)
@@ -863,8 +920,8 @@ def transpose(input: Tensor, axis: List[int]) -> Tensor:
 @jit
 def get_broadcast_shape(x: List[int], y: List[int]) -> List[int]:
     o = (
-        torch.zeros(x, dtype=torch.float32) +
-        torch.zeros(y, dtype=torch.float32)
+            torch.zeros(x, dtype=torch.float32) +
+            torch.zeros(y, dtype=torch.float32)
     )
     return list(o.shape)
 
@@ -915,7 +972,7 @@ def broadcast_concat(x: Tensor, y: Tensor, axis: int) -> Tensor:
     if axis < -final_rank or axis >= final_rank:
         raise ValueError(
             '`axis` out of range: got {}, but expected to be >= {} and < {}'.
-            format(axis, -final_rank, final_rank))
+                format(axis, -final_rank, final_rank))
     elif axis >= 0:
         # normalize `axis` to be negative
         axis = axis - final_rank
@@ -1017,7 +1074,7 @@ def reshape_tail(input: Tensor, ndims: int, shape: List[int]) -> Tensor:
         raise ValueError(
             '`input` must be at least `ndims`-dimensional: '
             '`shape(input)` is {}, while `ndims` is {}'.
-            format(input_shape, ndims)
+                format(input_shape, ndims)
         )
     left_shape = input_shape[: input_rank - ndims]
     return input.reshape(left_shape + shape)
@@ -1096,7 +1153,7 @@ def slice(input: Tensor,
         raise ValueError(
             '`len(slice_start)` must be less or equal to `rank(input)`: '
             'got input shape {}, slice_start {}, slice_length {}.'.
-            format(shape(input), slice_start, slice_length)
+                format(shape(input), slice_start, slice_length)
         )
     if slice_length is None:
         for i in range(-1, -(slice_count + 1), -1):
@@ -1137,7 +1194,7 @@ def pad(input: Tensor,
         raise ValueError(
             'The length of `padding` must not be larger than `rank(input)`: '
             '`padding` is {}, while `shape(input)` is {}'.
-            format(padding, shape(input))
+                format(padding, shape(input))
         )
     pad: List[int] = []
     for i in range(len(padding) - 1, -1, -1):
@@ -1292,7 +1349,6 @@ erf = torch.erf
 erfc = torch.erfc
 erfinv = torch.erfinv
 
-
 # ---- bivariate element-wise math operations ----
 add = torch.add
 sub = torch.sub
@@ -1431,7 +1487,7 @@ def reduce_min(input: Tensor,
                 input = squeeze(input, axis)
             return input
 
-        
+
 @jit
 def reduce_min_axis(input: Tensor, axis: int, keepdims: bool = False) -> Tensor:
     return torch.min(input, dim=axis, keepdim=keepdims)[0]
