@@ -1,3 +1,4 @@
+import random
 import math
 import subprocess
 from contextlib import contextmanager
@@ -229,24 +230,26 @@ def most_free_gpu_device(
         else:
             raise RuntimeError('No GPU is available.')
     else:
-        most_free = sorted(
-            list(gpu_memory_list.items()), key=lambda item: item[1]['free']
-        )[-1]  # type: Tuple[str, Dict[str, float]]
-        printer(f"choose cuda device {most_free[0]} because {most_free[1]}")
-        if least_free_mib is None or most_free[1]["free"] > least_free_mib:
+        available = list(filter(
+            lambda item: least_free_mib is None or item[1]['free'] > least_free_mib,
+            gpu_memory_list.items()
+        ))
+        if len(available) > 0:
+            choice = random.choice(available)
+            printer(f"choose cuda device {choice[0]} because {choice[1]}")
             try:
                 if occupy:
-                    x = torch.zeros((256, 1024, int(least_free_mib))).to(most_free[0])
-                    del x
-                return most_free[0]
-            except RuntimeError:
+                    # 直接创建比先创建到cpu上再to能节省内存
+                    torch.zeros((256, 1024, int(least_free_mib)), device=choice[0])
+                return choice[0]
+            except Exception:
                 printer(f"reserve gpu memory {least_free_mib}MiB failed")
                 return most_free_gpu_device(fallback_to_cpu, least_free_mib, occupy)
         elif fallback_to_cpu:
             printer("fallback to cpu")
             return CPU_DEVICE
         else:
-            raise RuntimeError(f'No enough memory: {most_free}')
+            raise RuntimeError(f'No enough memory: {gpu_memory_list}')
 
 
 def first_gpu_device(fallback_to_cpu: bool = True) -> str:
