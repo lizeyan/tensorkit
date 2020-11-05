@@ -241,6 +241,7 @@ def most_free_gpu_device(
                 if occupy:
                     # 直接创建比先创建到cpu上再to能节省内存
                     torch.zeros((256, 1024, int(least_free_mib)), device=choice[0])
+                    printer(f"reserve gpu memory {least_free_mib}MiB success")
                 return choice[0]
             except Exception:
                 printer(f"reserve gpu memory {least_free_mib}MiB failed")
