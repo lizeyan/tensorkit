@@ -6,6 +6,8 @@ from mltk import StatefulObject, BaseCheckpoint
 
 __all__ = ['Checkpoint']
 
+from tensorkit.backend import current_device
+
 
 class _TorchCheckpointableObject(StatefulObject):
     """Wraps a PyTorch checkpointable object into :class:`StatefulObject`."""
@@ -65,7 +67,7 @@ class Checkpoint(BaseCheckpoint):
 
     def _restore(self, checkpoint_path: str) -> None:
         data_path = os.path.join(checkpoint_path, 'data.pth')
-        state_dict = torch.load(data_path)
+        state_dict = torch.load(data_path, map_location=current_device())
 
         # check whether or not all keys exist
         for k in self._objects:

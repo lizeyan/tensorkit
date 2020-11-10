@@ -1,6 +1,7 @@
 import random
 import math
 import subprocess
+import time
 from contextlib import contextmanager
 from typing import *
 
@@ -243,9 +244,11 @@ def most_free_gpu_device(
                     torch.zeros((256, 1024, int(least_free_mib)), device=choice[0])
                     printer(f"reserve gpu memory {least_free_mib}MiB success")
                 return choice[0]
-            except Exception:
-                printer(f"reserve gpu memory {least_free_mib}MiB failed")
-                return most_free_gpu_device(fallback_to_cpu, least_free_mib, occupy)
+            except Exception as e:
+                wait_for_seconds = random.randint(10, 100)
+                printer(f"reserve gpu memory {least_free_mib}MiB failed: {e}. wait for {wait_for_seconds} seconds")
+                time.sleep(wait_for_seconds)
+                return most_free_gpu_device(fallback_to_cpu, least_free_mib, occupy, printer=printer)
         elif fallback_to_cpu:
             printer("fallback to cpu")
             return CPU_DEVICE
