@@ -241,11 +241,16 @@ def most_free_gpu_device(
             try:
                 if occupy:
                     # 直接创建比先创建到cpu上再to能节省内存
-                    torch.zeros((256, 1024, int(least_free_mib)), device=choice[0])
+                    variables = []
+                    for _ in range(250):
+                        variables.append(torch.zeros((1, 1000, int(least_free_mib)), device=choice[0]))
+                        # print(torch.cuda.memory_summary())
                     printer(f"reserve gpu memory {least_free_mib}MiB success")
+                    del variables
                 return choice[0]
             except Exception as e:
                 wait_for_seconds = random.randint(10, 100)
+                printer(torch.cuda.memory_summary())
                 printer(f"reserve gpu memory {least_free_mib}MiB failed: {e}. wait for {wait_for_seconds} seconds")
                 time.sleep(wait_for_seconds)
                 return most_free_gpu_device(fallback_to_cpu, least_free_mib, occupy, printer=printer)
