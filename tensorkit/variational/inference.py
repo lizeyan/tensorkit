@@ -135,6 +135,7 @@ class VariationalTrainingObjectives(_VariationalFactory):
     def sgvb(self,
              keepdims: bool = False,
              reduction: str = 'none',  # {'sum', 'mean' or 'none'}
+             beta: float = 1.0,
              ) -> T.Tensor:
         """
         Get the SGVB training objective.
@@ -148,7 +149,7 @@ class VariationalTrainingObjectives(_VariationalFactory):
         vi = self.vi
         return sgvb_estimator(
             # -(log p(x,z) - log q(z|x))
-            values=vi.latent_log_joint - vi.log_joint,
+            values=vi.latent_log_joint * beta - vi.log_joint,
             axis=vi.axis,
             keepdims=keepdims,
             reduction=reduction,
@@ -156,7 +157,8 @@ class VariationalTrainingObjectives(_VariationalFactory):
 
     def iwae(self,
              keepdims: bool = False,
-             reduction: str = 'none',  # {'sum', 'mean' or 'none'}
+             reduction: str = 'none',  # {'sum', 'mean' or 'none'},
+             beta: float = 1.0
              ) -> T.Tensor:
         """
         Get the SGVB training objective for importance weighted objective.
@@ -170,7 +172,7 @@ class VariationalTrainingObjectives(_VariationalFactory):
         """
         vi = self.vi
         return iwae_estimator(
-            log_values=vi.log_joint - vi.latent_log_joint,
+            log_values=vi.log_joint - vi.latent_log_joint * beta,
             axis=vi.axis,
             keepdims=keepdims,
             reduction=reduction,
