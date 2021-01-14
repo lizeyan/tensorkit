@@ -19,7 +19,7 @@ __all__ = [
 
     # normal
     'randn', 'randn_log_pdf',
-    'normal', 'normal_log_pdf',
+    'normal', 'normal_log_pdf', 'normal_log_pdf_huber',
 
     # bernoulli
     'bernoulli_logits_to_probs', 'bernoulli_probs_to_logits',
@@ -87,7 +87,10 @@ def randint(low: int, high: int, shape: List[int],
     elif dtype == 'int32':
         target_dtype = torch.int32
     else:
-        target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64, 'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
+        target_dtype = \
+            {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64,
+             'float16': torch.float16,
+             'float64': torch.float64, 'bool': torch.bool}[dtype]
 
     if device is None:
         device = current_device()
@@ -125,7 +128,7 @@ def random_permutation(n: int,
 @jit
 def randn(shape: List[int],
           dtype: str = settings.float_x,
-          device: Optional[str] = None,) -> Tensor:
+          device: Optional[str] = None, ) -> Tensor:
     if dtype == 'float32':
         real_dtype = torch.float32
     else:
@@ -192,6 +195,38 @@ def normal_log_pdf(given: Tensor,
     return ret
 
 
+@jit
+def normal_log_pdf_huber(
+        given: Tensor,
+        mean: Tensor,
+        logstd: Tensor,
+        group_ndims: int = 0,
+        validate_tensors: bool = False,
+        epsilon: float = float('inf'),
+) -> Tensor:
+    batch_ndims = max(len(given.shape), len(mean.shape), len(logstd.shape))
+    if group_ndims > batch_ndims:
+        raise ValueError(
+            '`group_ndims` is too large: the maximum possible value is {}, '
+            'but got {}'.format(batch_ndims, group_ndims))
+
+    c = -0.5 * math.log(2. * math.pi)
+    precision = exp(-logstd)
+    if validate_tensors:
+        precision = assert_finite(precision, 'precision')
+
+    _s = torch.abs(given - mean) * precision
+    ret = c - logstd - 0.5 * torch.where(
+        _s < epsilon,
+        torch.square(_s),
+        2 * epsilon * _s - epsilon * epsilon,
+    )
+
+    if group_ndims > 0:
+        ret = torch.sum(ret, dim=int_range(-group_ndims, 0))
+    return ret
+
+
 # ---- bernoulli distribution ----
 @jit
 def bernoulli_logits_to_probs(logits: Tensor) -> Tensor:
@@ -219,7 +254,10 @@ def bernoulli(probs: Tensor,
     elif dtype == 'int32':
         target_dtype = torch.int32
     else:
-        target_dtype = {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64, 'float16': torch.float16, 'float64': torch.float64, 'bool': torch.bool}[dtype]
+        target_dtype = \
+            {'int8': torch.int8, 'uint8': torch.uint8, 'int16': torch.int16, 'int64': torch.int64,
+             'float16': torch.float16,
+             'float64': torch.float64, 'bool': torch.bool}[dtype]
 
     # do sample
     probs = probs.detach()
